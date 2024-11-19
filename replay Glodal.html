@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earth Rebuild</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .loading-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            width: 100%;
+            max-width: 500px;
+            z-index: 1000;
+        }
+
+        .loading-text {
+            font-size: 24px;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: fadeInOut 2s infinite;
+            white-space: nowrap;
+        }
+
+        .loading-bar {
+            width: 400px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 auto;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .loading-progress {
+            width: 0%;
+            height: 100%;
+            background: #00ff00;
+            border-radius: 2px;
+            transition: width 0.5s ease-out;
+            animation: loadingProgress 7s linear forwards;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes loadingProgress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+
+        .stat-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 18px;
+            text-align: right;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .phase-title {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            color: white;
+            font-size: 24px;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+
+        .phase-description {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+
+        .timeline {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            width: 0;
+            background: white;
+            transition: width 0.5s linear;
+        }
+
+        .stat {
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            display: inline-block;
+            margin-left: 10px;
+        }
+
+        .progress {
+            height: 100%;
+            background: #00FF00;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 1s ease-in-out;
+        }
+
+        #nextButton {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 40px;
+            font-size: 24px;
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+            display: none;
+        }
+
+        #nextButton:hover {
+            background: white;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <div class="loading-text">Initializing Earth Rebuild Sequence...</div>
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <div class="stat-container">
+        <div class="stat">
+            Earth Formation
+            <div class="progress-bar"><div class="progress" id="oxygenProgress"></div></div>
+        </div>
+        <div class="stat">
+            Earth Life
+            <div class="progress-bar"><div class="progress" id="forestProgress"></div></div>
+        </div>
+        <div class="stat">
+            Earth Protection System
+            <div class="progress-bar"><div class="progress" id="oceanProgress"></div></div>
+        </div>
+        <div class="stat">
+            Earth Completion
+            <div class="progress-bar"><div class="progress" id="completionProgress"></div></div>
+        </div>
+    </div>
+    <button id="nextButton">CONTINUE</button>
+    <div class="phase-title" id="phaseTitle"></div>
+    <div class="phase-description" id="phaseDescription"></div>
+    <div class="timeline">
+        <div class="timeline-progress" id="timelineProgress"></div>
+    </div>
+ 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let currentState = 'initial';
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    
+        function startAfterLoading() {
+            document.querySelector('.loading-container').style.display = 'none';
+            document.querySelector('.stat-container').style.opacity = '1';
+            phase = 'gather';
+            progress = 0;
+        }
+    
+        setTimeout(startAfterLoading, 7000);
+    
+        const earthPhases = [
+            {
+                name: "Phase 1: Formation",
+                description: "Particles of matter begin to coalesce...",
+                duration: 5000,
+                color: new THREE.Color(0xff7700)
+            },
+            {
+                name: "Phase 2: Core Formation",
+                description: "The core takes shape, generating Earth's magnetic field...",
+                duration: 5000,
+                color: new THREE.Color(0xff0000)
+            },
+            {
+                name: "Phase 3: Ocean Formation",
+                description: "Water vapor condenses, forming the first oceans...",
+                duration: 5000,
+                color: new THREE.Color(0x0077ff)
+            },
+            {
+                name: "Phase 4: Atmosphere",
+                description: "The atmosphere forms, protecting the surface...",
+                duration: 5000,
+                color: new THREE.Color(0x00ffff)
+            }
+        ];
+    
+        const lifePhases = [
+            {
+                name: "Phase 1: Chemical Soup",
+                description: "Organic compounds form in the primordial seas...",
+                duration: 5000,
+                color: new THREE.Color(0x00ff77)
+            },
+            {
+                name: "Phase 2: First RNA",
+                description: "Simple RNA molecules begin to self-replicate...",
+                duration: 5000,
+                color: new THREE.Color(0x00ff00)
+            },
+            {
+                name: "Phase 3: Protocells",
+                description: "Primitive cell membranes develop...",
+                duration: 5000,
+                color: new THREE.Color(0x11ff11)
+            },
+            {
+                name: "Phase 4: First Life",
+                description: "The first single-celled organisms emerge...",
+                duration: 5000,
+                color: new THREE.Color(0x22ff22)
+            }
+        ];
+    
+        let phases = earthPhases;
+        let currentPhase = 0;
+        let phaseProgress = 0;
+        let particles;
+        let phase = 'loading';
+        let progress = 0;
+    
+        function createParticles() {
+            const geometry = new THREE.BufferGeometry();
+            const particleCount = 50000;
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const particles = [];
+    
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                positions[i3] = (Math.random() - 0.5) * 10;
+                positions[i3 + 1] = (Math.random() - 0.5) * 10;
+                positions[i3 + 2] = (Math.random() - 0.5) * 10;
+    
+                const phi = Math.acos(-1 + (2 * i) / particleCount);
+                const theta = Math.sqrt(particleCount * Math.PI) * phi;
+    
+                particles.push({
+                    targetX: 2 * Math.sin(phi) * Math.cos(theta),
+                    targetY: 2 * Math.cos(phi),
+                    targetZ: 2 * Math.sin(phi) * Math.sin(theta),
+                    startX: positions[i3],
+                    startY: positions[i3 + 1],
+                    startZ: positions[i3 + 2]
+                });
+    
+                colors[i3] = 0.5;
+                colors[i3 + 1] = 0.8;
+                colors[i3 + 2] = 1;
+            }
+    
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    
+            const material = new THREE.PointsMaterial({
+                size: 0.02,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+    
+            const points = new THREE.Points(geometry, material);
+            scene.add(points);
+            return { points, particles };
+        }
+    
+        let particleSystem = createParticles();
+        particles = particleSystem.points;
+        let particleData = particleSystem.particles;
+    
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+    
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(5, 3, 5);
+        scene.add(pointLight);
+    
+        camera.position.z = 5;
+        function addGlow() {
+        const glowGeometry = new THREE.SphereGeometry(2.2, 32, 32);
+        const glowMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                viewVector: { value: camera.position }
+            },
+            vertexShader: `
+                uniform vec3 viewVector;
+                varying float intensity;
+                void main() {
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    vec3 actual_normal = normalize(normalMatrix * normal);
+                    intensity = pow(dot(actual_normal, normalize(viewVector)), 4.0);
+                }
+            `,
+            fragmentShader: `
+                varying float intensity;
+                void main() {
+                    vec3 glow = vec3(0.3, 0.6, 1.0) * intensity;
+                    gl_FragColor = vec4(glow, 0.5);
+                }
+            `,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true
+        });
+
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        scene.add(glowMesh);
+        return glowMesh;
+    }
+
+    function createRealEarth() {
+        currentState = 'realEarth';
+        const positions = particles.geometry.attributes.position.array;
+        const colors = particles.geometry.attributes.color.array;
+
+        for (let i = 0; i < particleData.length; i++) {
+            const i3 = i * 3;
+            const phi = Math.acos(-1 + (2 * i) / particleData.length);
+            const theta = Math.sqrt(particleData.length * Math.PI) * phi;
+
+            // 개선된 노이즈 패턴으로 더 자연스러운 지형 생성
+            const noise = Math.sin(5 * phi) * Math.cos(5 * theta) + 
+                         Math.sin(8 * theta) * Math.cos(3 * phi) + 
+                         Math.sin(3 * phi + theta) * 0.5;
+            
+            // 육지와 바다의 비율을 7:3으로 조정
+            const isLand = noise > 0.7;
+
+            if (isLand) {
+                // 육지 색상을 더 자연스럽게
+                const greenVariation = Math.random() * 0.2;
+                colors[i3] = 0.25 + Math.random() * 0.1;        // R: 약간 갈색빛
+                colors[i3 + 1] = 0.45 + greenVariation;         // G: 녹색 계열
+                colors[i3 + 2] = 0.15 + Math.random() * 0.1;    // B: 약간의 파란빛
+            } else {
+                // 바다 색상을 더 깊고 자연스럽게
+                const depthVariation = Math.random() * 0.2;
+                colors[i3] = 0.05 + depthVariation * 0.1;       // R: 깊은 바다색
+                colors[i3 + 1] = 0.1 + depthVariation * 0.2;    // G: 약간의 변화
+                colors[i3 + 2] = 0.5 + depthVariation;          // B: 풍부한 파란색
+            }
+
+            const latitude = Math.acos(positions[i3 + 1] / 2);
+            if (latitude < 0.4 || latitude > 2.7) {
+                const iceVariation = Math.random() * 0.1;
+                colors[i3] = 0.9 + iceVariation;
+                colors[i3 + 1] = 0.9 + iceVariation;
+                colors[i3 + 2] = 0.95 + iceVariation;
+            }
+
+            const viewAngle = Math.abs(Math.sin(phi));
+            if (viewAngle < 0.2) {
+                colors[i3] += 0.1;
+                colors[i3 + 1] += 0.1;
+                colors[i3 + 2] += 0.15;
+            }
+        }
+
+        particles.geometry.attributes.color.needsUpdate = true;
+        particles.material.size = 0.02;
+
+        const cloudParticles = createCloudLayer();
+        scene.add(cloudParticles);
+
+        const atmosphere = new THREE.Mesh(
+            new THREE.SphereGeometry(2.15, 32, 32),
+            new THREE.MeshPhongMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.2
+            })
+        );
+        scene.add(atmosphere);
+    }
+
+    function createCloudLayer() {
+        const cloudGeometry = new THREE.BufferGeometry();
+        const cloudCount = 15000;
+        const cloudPositions = new Float32Array(cloudCount * 3);
+        const cloudColors = new Float32Array(cloudCount * 3);
+
+        for (let i = 0; i < cloudCount; i++) {
+            const i3 = i * 3;
+            const phi = Math.random() * Math.PI * 2;
+            const theta = Math.random() * Math.PI;
+            const radius = 2.05 + Math.random() * 0.03;
+
+            cloudPositions[i3] = radius * Math.sin(theta) * Math.cos(phi);
+            cloudPositions[i3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+            cloudPositions[i3 + 2] = radius * Math.cos(theta);
+
+            const cloudBrightness = 0.9 + Math.random() * 0.1;
+            cloudColors[i3] = cloudBrightness;
+            cloudColors[i3 + 1] = cloudBrightness;
+            cloudColors[i3 + 2] = cloudBrightness;
+        }
+
+        cloudGeometry.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
+        cloudGeometry.setAttribute('color', new THREE.BufferAttribute(cloudColors, 3));
+
+        const cloudMaterial = new THREE.PointsMaterial({
+            size: 0.03,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.4
+        });
+
+        return new THREE.Points(cloudGeometry, cloudMaterial);
+    }
+    function finalizeEarth() {
+        currentState = 'completed';
+        const positions = particles.geometry.attributes.position.array;
+        const colors = particles.geometry.attributes.color.array;
+
+        for (let i = 0; i < particleData.length; i++) {
+            const i3 = i * 3;
+            const phi = Math.acos(-1 + (2 * i) / particleData.length);
+            const theta = Math.sqrt(particleData.length * Math.PI) * phi;
+
+            positions[i3] = 2 * Math.sin(phi) * Math.cos(theta);
+            positions[i3 + 1] = 2 * Math.cos(phi);
+            positions[i3 + 2] = 2 * Math.sin(phi) * Math.sin(theta);
+
+            // 더 자연스러운 색상 분포를 위한 노이즈 패턴
+            const noise = Math.sin(5 * phi) * Math.cos(5 * theta) + 
+                         Math.sin(8 * theta) * Math.cos(3 * phi) + 
+                         Math.sin(3 * phi + theta) * 0.5;
+
+            // 해양과 육지의 비율 조정 (7:3)
+            if (noise > 0.7) {
+                // 육지 색상
+                const landVariation = Math.random() * 0.2;
+                colors[i3] = 0.25 + landVariation;
+                colors[i3 + 1] = 0.45 + landVariation;
+                colors[i3 + 2] = 0.15 + landVariation;
+            } else {
+                // 해양 색상
+                const oceanDepth = Math.random() * 0.2;
+                colors[i3] = 0.05 + oceanDepth * 0.1;
+                colors[i3 + 1] = 0.1 + oceanDepth * 0.2;
+                colors[i3 + 2] = 0.5 + oceanDepth;
+            }
+
+            // 극지방 처리
+            const latitude = Math.acos(positions[i3 + 1] / 2);
+            if (latitude < 0.4 || latitude > 2.7) {
+                const snowVariation = Math.random() * 0.1;
+                colors[i3] = 0.9 + snowVariation;
+                colors[i3 + 1] = 0.9 + snowVariation;
+                colors[i3 + 2] = 0.95 + snowVariation;
+            }
+        }
+
+        particles.geometry.attributes.position.needsUpdate = true;
+        particles.geometry.attributes.color.needsUpdate = true;
+        particles.material.size = 0.02;
+
+        const glow = addGlow();
+        
+        const atmosphere = new THREE.Mesh(
+            new THREE.SphereGeometry(2.1, 32, 32),
+            new THREE.MeshPhongMaterial({
+                color: 0x6699ff,
+                transparent: true,
+                opacity: 0.2
+            })
+        );
+        scene.add(atmosphere);
+
+        setTimeout(() => {
+            const nextButton = document.getElementById('nextButton');
+            nextButton.textContent = "Transform to Real Earth";
+            nextButton.style.display = 'block';
+            nextButton.style.opacity = '1';
+        }, 2000);
+
+        function animateRotation() {
+            if (currentState === 'completed' || currentState === 'realEarth') {
+                particles.rotation.y += 0.002;
+                glow.rotation.y += 0.002;
+                atmosphere.rotation.y += 0.002;
+                requestAnimationFrame(animateRotation);
+            }
+        }
+        animateRotation();
+    }
+
+    function startCreationPhase() {
+        currentState = 'creation';
+        phase = 'creation';
+        progress = 0;
+        currentPhase = 0;
+        phases = earthPhases;
+        
+        document.querySelector('.timeline').style.opacity = '1';
+        updateUI();
+    }
+
+    function startLifeFormation() {
+        currentState = 'lifeFormation';
+        currentPhase = 0;
+        phaseProgress = 0;
+        phases = lifePhases;
+        
+        document.querySelector('.timeline').style.opacity = '1';
+        document.querySelector('.stat-container').style.opacity = '1';
+        updateUI();
+    }
+
+    function updateStats(progress, stage) {
+        if (stage === 'earth') {
+            document.getElementById('oxygenProgress').style.width = '100%';
+            document.getElementById('forestProgress').style.width = '0%';
+            document.getElementById('oceanProgress').style.width = '0%';
+            document.getElementById('completionProgress').style.width = '0%';
+        } else if (stage === 'life') {
+            document.getElementById('oxygenProgress').style.width = '100%';
+            document.getElementById('forestProgress').style.width = '100%';
+            document.getElementById('oceanProgress').style.width = '0%';
+            document.getElementById('completionProgress').style.width = '0%';
+        } else if (stage === 'protection') {
+            document.getElementById('oxygenProgress').style.width = '100%';
+            document.getElementById('forestProgress').style.width = '100%';
+            document.getElementById('oceanProgress').style.width = '100%';
+            document.getElementById('completionProgress').style.width = '0%';
+        } else if (stage === 'completion') {
+            document.getElementById('oxygenProgress').style.width = '100%';
+            document.getElementById('forestProgress').style.width = '100%';
+            document.getElementById('oceanProgress').style.width = '100%';
+            document.getElementById('completionProgress').style.width = '100%';
+        }
+    }
+    function updateParticlesGathering() {
+        const positions = particles.geometry.attributes.position.array;
+        const colors = particles.geometry.attributes.color.array;
+
+        for (let i = 0; i < particleData.length; i++) {
+            const i3 = i * 3;
+            const particle = particleData[i];
+
+            positions[i3] = particle.startX + (particle.targetX - particle.startX) * progress;
+            positions[i3 + 1] = particle.startY + (particle.targetY - particle.startY) * progress;
+            positions[i3 + 2] = particle.startZ + (particle.targetZ - particle.startZ) * progress;
+
+            colors[i3] = 0.5 - progress * 0.3;
+            colors[i3 + 1] = 0.8 - progress * 0.3;
+            colors[i3 + 2] = 1 - progress * 0.7;
+        }
+
+        particles.geometry.attributes.position.needsUpdate = true;
+        particles.geometry.attributes.color.needsUpdate = true;
+    }
+
+    function updateParticlesCreation() {
+        const positions = particles.geometry.attributes.position.array;
+        const colors = particles.geometry.attributes.color.array;
+        const phase = phases[currentPhase];
+        const isLifePhase = currentState === 'lifeFormation';
+
+        for (let i = 0; i < positions.length; i += 3) {
+            const targetColor = phase.color;
+            colors[i] = colors[i] + (targetColor.r - colors[i]) * 0.1;
+            colors[i + 1] = colors[i + 1] + (targetColor.g - colors[i + 1]) * 0.1;
+            colors[i + 2] = colors[i + 2] + (targetColor.b - colors[i + 2]) * 0.1;
+
+            if (isLifePhase) {
+                const particleIndex = i / 3;
+                const time = Date.now() * 0.001;
+                const offset = Math.sin(time + particleIndex) * 0.02;
+                
+                positions[i] += offset * Math.random() * 0.01;
+                positions[i + 1] += offset * Math.random() * 0.01;
+                positions[i + 2] += offset * Math.random() * 0.01;
+            }
+        }
+
+        particles.geometry.attributes.position.needsUpdate = isLifePhase;
+        particles.geometry.attributes.color.needsUpdate = true;
+    }
+
+    function updateUI() {
+        if (currentPhase < phases.length) {
+            const phase = phases[currentPhase];
+            const titleElement = document.getElementById('phaseTitle');
+            const descriptionElement = document.getElementById('phaseDescription');
+
+            titleElement.textContent = phase.name;
+            descriptionElement.textContent = phase.description;
+
+            titleElement.style.opacity = '1';
+            descriptionElement.style.opacity = '1';
+        }
+    }
+
+    function updateTimeline() {
+        const progress = (currentPhase + phaseProgress) / phases.length * 100;
+        document.getElementById('timelineProgress').style.width = `${progress}%`;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (currentState === 'initial') {
+            if (phase === 'gather') {
+                progress += 0.02;
+                updateParticlesGathering();
+
+                if (progress >= 1) {
+                    phase = 'rotate';
+                    setTimeout(() => {
+                        const nextButton = document.getElementById('nextButton');
+                        nextButton.style.display = 'block';
+                        setTimeout(() => {
+                            nextButton.style.opacity = '1';
+                        }, 100);
+                    }, 2000);
+                }
+            } else if (phase === 'rotate') {
+                particles.rotation.y += 0.005;
+            }
+        } else if (currentState === 'creation' || currentState === 'lifeFormation') {
+            if (currentPhase < phases.length) {
+                phaseProgress += 0.01;
+                if (phaseProgress >= 1) {
+                    currentPhase++;
+                    phaseProgress = 0;
+                    if (currentPhase < phases.length) {
+                        updateUI();
+                    } else if (currentState === 'creation') {
+                        const nextButton = document.getElementById('nextButton');
+                        nextButton.textContent = "Begin Life Formation";
+                        nextButton.style.display = 'block';
+                        nextButton.style.opacity = '1';
+                        document.querySelector('.timeline').style.opacity = '0';
+                        document.querySelector('.phase-title').style.opacity = '0';
+                        document.querySelector('.phase-description').style.opacity = '0';
+                    } else if (currentState === 'lifeFormation') {
+                        const nextButton = document.getElementById('nextButton');
+                        nextButton.textContent = "Complete Earth";
+                        nextButton.style.display = 'block';
+                        nextButton.style.opacity = '1';
+                        document.querySelector('.timeline').style.opacity = '0';
+                        document.querySelector('.phase-title').style.opacity = '0';
+                        document.querySelector('.phase-description').style.opacity = '0';
+                    }
+                }
+                updateParticlesCreation();
+                updateTimeline();
+            }
+            particles.rotation.y += 0.001;
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    document.getElementById('nextButton').addEventListener('click', () => {
+        const nextButton = document.getElementById('nextButton');
+        if (currentState === 'initial') {
+            nextButton.style.opacity = '0';
+            document.querySelector('.stat-container').style.opacity = '1';
+            updateStats(progress, 'earth');
+            setTimeout(() => {
+                nextButton.style.display = 'none';
+                startCreationPhase();
+            }, 1000);
+        } else if (currentState === 'creation') {
+            nextButton.style.opacity = '0';
+            updateStats(progress, 'life');
+            setTimeout(() => {
+                nextButton.style.display = 'none';
+                startLifeFormation();
+            }, 1000);
+        } else if (currentState === 'lifeFormation') {
+            nextButton.style.opacity = '0';
+            updateStats(progress, 'protection');
+            setTimeout(() => {
+                nextButton.style.display = 'none';
+                finalizeEarth();
+            }, 1000);
+        } else if (currentState === 'completed') {
+            nextButton.style.opacity = '0';
+            updateStats(progress, 'completion');
+            setTimeout(() => {
+                nextButton.style.display = 'none';
+                createRealEarth();
+            }, 1000);
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+    
+    </script>
+</script>
+</body>
+</html>
+    
